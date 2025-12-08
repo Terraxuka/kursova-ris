@@ -1,0 +1,49 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "master" ] # Перевір, чи твоя головна гілка називається master або main
+
+jobs:
+  # 1. Збираємо образ у хмарі GitHub (щоб не вантажити твій комп)
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.terraxuka }}
+          password: ${{ secrets.dckr_pat_huQzh0hG_dgdodpn-2yhVg6j4gc }}
+
+      - name: Build and Push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          # Заміни 'your-dockerhub-username' на твій логін Docker Hub
+          tags: ${{ secrets.terraxuka }}/purple-angular:latest
+
+  # 2. Деплоїмо на твій комп'ютер через Self-Hosted Runner
+  deploy-local:
+    needs: build-and-push
+    runs-on: self-hosted  # <--- Ця команда шукає твій запущений Runner
+    steps:
+      - name: Restart Container
+        run: |
+          # Стягуємо свіжий образ
+          docker pull ${{ secrets.terraxuka }}/purple-angular:latest
+          
+          # Зупиняємо старий контейнер (якщо є)
+          docker stop angular-app || true
+          docker rm angular-app || true
+          
+          # Запускаємо новий
+          # Сайт буде доступний за адресою http://localhost:4200
+          docker run -d \
+            --name angular-app \
+            --restart unless-stopped \
+            -p 4200:80 \
+            ${{ secrets.terraxuka }}/purple-angular:latest
